@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>主页</title>
+</head>
+<body>
+    <h1>欢迎回来！</h1>
+    <nav>
+        <a href="#">课程列表</a> |
+        <a href="#">行为记录</a> |
+        <a href="#">个人信息</a> |
+        <a href="{{ url_for('logout') }}">退出登录</a>
+    </nav>
+    <h2>课程列表</h2>
+    <ul>
+        {% for course in courses %}
+        <li>{{ course.name }}</li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('behavior_detection') }}">行为检测</a>
+</body>
+</html>
