@@ -2,88 +2,160 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>行为检测</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        /* 基础样式优化 */
         body {
-            background-image: url('{{ url_for("static", filename="background.jpg") }}');
-            background-size: cover;
-            background-position: center;
+            background: linear-gradient(135deg, #6B8DD6 0%, #8E37D7 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             padding: 20px;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        .video-container {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+
+        /* 主容器样式 */
+        .main-container {
             max-width: 1200px;
-            margin: 0 auto;
+            width: 90%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            padding: 40px 30px;
         }
-        .video-container img {
+
+        /* 标题样式 */
+        h1 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        /* 表单样式 */
+        .upload-form {
+            margin-bottom: 30px;
+        }
+        .upload-form .form-control {
+            border-radius: 25px;
+            padding: 12px 20px;
+        }
+        .upload-form .btn {
+            border-radius: 25px;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        /* 视频容器样式 */
+        .video-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .video-box {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .video-box h3 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .video-display {
             width: 100%;
             border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        .canvas-container {
-            position: relative;
-            width: 100%;
-            height: auto;
+
+        /* 控制按钮样式 */
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
         }
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        .control-buttons .btn {
+            border-radius: 25px;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .control-buttons .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        /* 加载指示器样式 */
+        .loading-indicator {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            margin-top: 15px;
+        }
+        .loading-indicator .spinner-border {
+            width: 3rem;
+            height: 3rem;
         }
     </style>
 </head>
 <body>
-    <div class="video-container">
-        <h1 class="text-center">行为检测</h1>
-        <form method="POST" action="{{ url_for('upload_video') }}" enctype="multipart/form-data">
+    <div class="main-container">
+        <h1>行为检测系统</h1>
+
+        <!-- 上传表单 -->
+        <form class="upload-form" method="POST" action="{{ url_for('upload_video') }}" enctype="multipart/form-data">
             <div class="mb-3">
                 <label for="video" class="form-label">上传视频文件:</label>
                 <input type="file" class="form-control" id="video" name="video" accept="video/*" required>
             </div>
             <button type="submit" class="btn btn-primary w-100">上传视频</button>
         </form>
-        <hr>
-        <!-- <div class="text-center">
-            <h3>或使用摄像头实时检测</h3>
-            <div class="canvas-container">
-                <img src="{{ url_for('video_feed') }}" alt="实时检测视频">
-                <canvas id="detectionCanvas"></canvas>
-            </div>
-            <div class="mt-3">
-                <button id="start-btn" class="btn btn-success">开始检测</button>
-                <button id="stop-btn" class="btn btn-danger">停止检测</button>
-            </div>
-        </div> -->
-         <!-- 视频显示区域 -->
-         <div class="video-container">
+
+        <!-- 视频展示区 -->
+        <div class="video-container">
             <div class="video-box">
-                <h3>原始视频</h3>
+                <h3>预览视频</h3>
                 <video id="originalVideo" class="video-display" controls>
                     <source id="videoSource" type="video/mp4">
                 </video>
             </div>
             <div class="video-box">
                 <h3>检测结果</h3>
-                <img id="detectionFeed" class="video-display" alt="检测结果">
+                <img id="detectionFeed" class="video-display" src="" alt="检测结果">
+                <div id="loadingIndicator" class="loading-indicator">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                </div>
             </div>
         </div>
-         <!-- 控制按钮 -->
-         <div class="text-center mt-4">
+
+        <!-- 控制按钮 -->
+        <div class="control-buttons">
             <button id="startBtn" class="btn btn-success">开始检测</button>
             <button id="stopBtn" class="btn btn-danger">停止检测</button>
         </div>
     </div>
+
     <script>
         const originalVideo = document.getElementById('originalVideo');
         const detectionFeed = document.getElementById('detectionFeed');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
         let isDetecting = false;
+
         // 文件上传预览
         document.querySelector('input[type="file"]').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -94,13 +166,8 @@
             }
         });
 
-         // 开始检测
+        // 开始检测
         startBtn.onclick = async function() {
-            // if (!originalVideo.src) {
-            //     alert('请先上传视频文件');
-            //     return;
-            // }
-            
             const response = await fetch('/start_detection');
             if (response.ok) {
                 isDetecting = true;
@@ -108,9 +175,13 @@
                 stopBtn.disabled = false;
                 detectionFeed.src = `/video_detection_feed?t=${Date.now()}`;
                 originalVideo.play();
+                loadingIndicator.style.display = 'flex';
+            } else {
+                alert('请先上传视频文件');
             }
         };
-         // 停止检测
+
+        // 停止检测
         stopBtn.onclick = async function() {
             const response = await fetch('/stop_detection');
             if (response.ok) {
@@ -119,14 +190,21 @@
                 stopBtn.disabled = true;
                 detectionFeed.src = '';
                 originalVideo.pause();
+                loadingIndicator.style.display = 'none';
             }
         };
-        // 视频结束时重置检测
-        originalVideo.onended = function() {
+
+        // 检测结果加载完成
+        detectionFeed.onload = function() {
+            loadingIndicator.style.display = 'none';
+        };
+
+        // 监听视频结束事件
+        detectionFeed.addEventListener('ended', function() {
             if (isDetecting) {
-                stopBtn.click();
+                stopBtn.click(); // 触发停止检测逻辑
             }
-        };
+        });
     </script>
 </body>
 </html>
