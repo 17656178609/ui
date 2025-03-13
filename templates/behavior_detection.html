@@ -16,12 +16,24 @@
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
         }
         .video-container img {
             width: 100%;
             border-radius: 10px;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: auto;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
@@ -33,24 +45,87 @@
                 <label for="video" class="form-label">上传视频文件:</label>
                 <input type="file" class="form-control" id="video" name="video" accept="video/*" required>
             </div>
-            <button type="submit" class="btn btn-primary w-100">上传并检测</button>
+            <button type="submit" class="btn btn-primary w-100">上传视频</button>
         </form>
         <hr>
-        <div class="text-center">
+        <!-- <div class="text-center">
             <h3>或使用摄像头实时检测</h3>
-            <img src="{{ url_for('video_feed') }}" alt="实时检测视频">
+            <div class="canvas-container">
+                <img src="{{ url_for('video_feed') }}" alt="实时检测视频">
+                <canvas id="detectionCanvas"></canvas>
+            </div>
             <div class="mt-3">
                 <button id="start-btn" class="btn btn-success">开始检测</button>
                 <button id="stop-btn" class="btn btn-danger">停止检测</button>
             </div>
+        </div> -->
+         <!-- 视频显示区域 -->
+         <div class="video-container">
+            <div class="video-box">
+                <h3>原始视频</h3>
+                <video id="originalVideo" class="video-display" controls>
+                    <source id="videoSource" type="video/mp4">
+                </video>
+            </div>
+            <div class="video-box">
+                <h3>检测结果</h3>
+                <img id="detectionFeed" class="video-display" alt="检测结果">
+            </div>
+        </div>
+         <!-- 控制按钮 -->
+         <div class="text-center mt-4">
+            <button id="startBtn" class="btn btn-success">开始检测</button>
+            <button id="stopBtn" class="btn btn-danger">停止检测</button>
         </div>
     </div>
     <script>
-        document.getElementById('start-btn').onclick = function() {
-            fetch('/start_detection');
+        const originalVideo = document.getElementById('originalVideo');
+        const detectionFeed = document.getElementById('detectionFeed');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        let isDetecting = false;
+        // 文件上传预览
+        document.querySelector('input[type="file"]').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const videoUrl = URL.createObjectURL(file);
+                document.getElementById('videoSource').src = videoUrl;
+                document.getElementById('originalVideo').load();
+            }
+        });
+
+         // 开始检测
+        startBtn.onclick = async function() {
+            // if (!originalVideo.src) {
+            //     alert('请先上传视频文件');
+            //     return;
+            // }
+            
+            const response = await fetch('/start_detection');
+            if (response.ok) {
+                isDetecting = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                detectionFeed.src = `/video_detection_feed?t=${Date.now()}`;
+                originalVideo.play();
+            }
         };
-        document.getElementById('stop-btn').onclick = function() {
-            fetch('/stop_detection');
+         // 停止检测
+        stopBtn.onclick = async function() {
+            const response = await fetch('/stop_detection');
+            if (response.ok) {
+                isDetecting = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                detectionFeed.src = '';
+                originalVideo.pause();
+            }
+        };
+        // 视频结束时重置检测
+        originalVideo.onended = function() {
+            if (isDetecting) {
+                stopBtn.click();
+            }
         };
     </script>
 </body>

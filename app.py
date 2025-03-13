@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, Response
+from flask import Flask, render_template, request, redirect, url_for, Response, jsonify
 from ultralytics import YOLO
 import os
 import cv2
@@ -7,6 +7,8 @@ import json
 from collections import defaultdict
 import time
 import torch
+import numpy as np
+
 app = Flask(__name__)
 
 # 模拟用户数据
@@ -16,11 +18,8 @@ users = {
 }
 
 # 加载训练好的 YOLOv8 模型
-model = YOLO("best.pt") # 将模型加载到 GPU
-# model = YOLO("yolov8n.pt")
+model = YOLO("yolov8n.pt")  # 使用 GPU
 
-if model is None:
-    raise ValueError("模型加载失败，请检查模型文件路径。")
 # 上传视频保存路径
 UPLOAD_FOLDER = "uploads"
 if not os.path.exists(UPLOAD_FOLDER):
@@ -34,8 +33,8 @@ if not os.path.exists(RESULTS_FOLDER):
 # 全局变量用于实时视频流
 camera = None
 is_detecting = False
-detection_stats = defaultdict(list)  # 用于存储时间维度的检测结果
-
+detection_boxes = []  # 用于存储检测框的坐标
+current_video_path = None # 用于存储当前视频路径
 # 登录页面
 @app.route("/", methods=["GET", "POST"])
 def login():
@@ -56,45 +55,79 @@ def behavior_detection():
 # 处理上传的视频
 @app.route("/upload_video", methods=["POST"])
 def upload_video():
-    global detection_stats
-    detection_stats = defaultdict(list)  # 重置统计结果
+    global detection_boxes
+    detection_boxes = []  # 重置检测框数据
 
     video_file = request.files.get("video")
     if video_file:
         # 保存视频文件
         video_path = os.path.join(UPLOAD_FOLDER, video_file.filename)
-        video_file.save(video_path)
+        # video_file.save(video_path)
+        # 将视频路径存储在会话中
+        global current_video_path
+        current_video_path = video_path
+        # # 使用 YOLOv8 模型进行检测
+        # cap = cv2.VideoCapture(video_path)
+        # start_time = time.time()
+        # while cap.isOpened():
+        #     success, frame = cap.read()
+        #     if not success:
+        #         break
 
-        # 使用 YOLOv8 模型进行检测
-        cap = cv2.VideoCapture(video_path)
-        start_time = time.time()
-        while cap.isOpened():
-            success, frame = cap.read()
-            if not success:
-                break
-            # 将帧转换为 GPU 张量
-            # 调整输入图像的尺寸
-            frame = cv2.resize(frame, (640, 640))  # 调整输入图像的尺寸
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # 转换为 RGB
-            frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).float().to("cuda") / 255.0  # 归一化并加载到 GPU
-            frame_tensor = frame_tensor.unsqueeze(0)  # 添加 batch 维度
+        #     # 调整输入图像的尺寸
+        #     frame = cv2.resize(frame, (640, 640))  # 调整输入图像的尺寸
 
-            # 进行检测
-            results = model(frame_tensor)
-            current_time = time.time() - start_time
-            for result in results:
-                for box in result.boxes:
-                    class_id = int(box.cls)
-                    class_name = model.names[class_id]
-                    detection_stats[class_name].append(current_time)  # 记录检测时间
+            # # 将帧转换为 GPU 张量
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # 转换为 RGB
+            # frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).float().to("cuda") / 255.0  # 归一化并加载到 GPU
+            # frame_tensor = frame_tensor.unsqueeze(0)  # 添加 batch 维度
 
-        cap.release()
-        return redirect(url_for("detection_results"))
+        #     # 进行检测
+        #     results = model(frame_tensor)
+        #     detection_boxes = results[0].boxes.xyxy.cpu().numpy().tolist()  # 获取检测框坐标
+
+        # cap.release()
+        return redirect(url_for("behavior_detection"))
     return "视频上传失败！"
 
+
+# 添加视频检测流路由
+@app.route('/video_detection_feed')
+def video_detection_feed():
+    def generate():
+        global current_video_path, is_detecting
+        if not current_video_path:
+            return
+            
+        cap = cv2.VideoCapture(current_video_path)
+        while is_detecting and cap.isOpened():
+            success, frame = cap.read()
+            if not success:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 循环播放
+                continue
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # 转换为 RGB
+            # frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).float().to("cuda") / 255.0  # 归一化并加载到 GPU
+            # frame_tensor = frame_tensor.unsqueeze(0)  # 添加 batch 维度
+            # 进行检测
+            results = model(frame)
+            
+            # 在原始帧上绘制检测结果
+            annotated_frame = results[0].plot()
+            
+            # 转换为JPEG格式
+            ret, buffer = cv2.imencode('.jpg', annotated_frame)
+            frame_bytes = buffer.tobytes()
+            
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        
+        cap.release()
+
+    return Response(generate(),
+                   mimetype='multipart/x-mixed-replace; boundary=frame')
 # 实时视频流
 def generate_frames():
-    global camera, is_detecting, detection_stats
+    global camera, is_detecting, detection_boxes
     camera = cv2.VideoCapture(0)  # 打开摄像头
     start_time = time.time()
     while is_detecting:
@@ -102,24 +135,20 @@ def generate_frames():
         if not success:
             break
         else:
+            # 调整输入图像的尺寸
+            frame = cv2.resize(frame, (640, 640))  # 调整输入图像的尺寸
+
             # 将帧转换为 GPU 张量
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # 转换为 RGB
             frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).float().to("cuda") / 255.0  # 归一化并加载到 GPU
             frame_tensor = frame_tensor.unsqueeze(0)  # 添加 batch 维度
 
-            # 使用 YOLOv8 模型进行实时检测
+            # 进行检测
             results = model(frame_tensor)
-            current_time = time.time() - start_time
-            annotated_frame = results[0].plot()  # 绘制检测结果
-
-            # 更新统计结果
-            for box in results[0].boxes:
-                class_id = int(box.cls)
-                class_name = model.names[class_id]
-                detection_stats[class_name].append(current_time)  # 记录检测时间
+            detection_boxes = results[0].boxes.xyxy.cpu().numpy().tolist()  # 获取检测框坐标
 
             # 将帧转换为 JPEG 格式
-            ret, buffer = cv2.imencode('.jpg', annotated_frame)
+            ret, buffer = cv2.imencode('.jpg', frame)
             frame = buffer.tobytes()
 
             # 以流式响应返回帧
@@ -132,29 +161,29 @@ def video_feed():
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
+# 返回检测框数据
+@app.route('/detection_data')
+def detection_data():
+    return jsonify(detection_boxes)
+
 # 开始检测
 @app.route("/start_detection")
 def start_detection():
-    global is_detecting, detection_stats
+    global is_detecting
     is_detecting = True
-    detection_stats = defaultdict(list)  # 重置统计结果
     return "Detection started"
 
 # 停止检测
 @app.route("/stop_detection")
 def stop_detection():
-    global is_detecting, camera
+    global is_detecting
     is_detecting = False
-    if camera:
-        camera.release()
-    return redirect(url_for("detection_results"))
+    return "Detection stopped"
 
 # 检测结果页面
 @app.route("/detection_results")
 def detection_results():
-    # 将统计结果转换为 JSON 格式
-    stats_json = json.dumps(detection_stats)
-    return render_template("detection_results.html", stats_json=stats_json)
+    return render_template("detection_results.html")
 
 # 退出登录
 @app.route("/logout")
