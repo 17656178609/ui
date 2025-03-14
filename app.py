@@ -18,7 +18,7 @@ users = {
 }
 
 # 加载训练好的 YOLOv8 模型
-model = YOLO("yolov8n.pt")  # 使用 GPU
+model = YOLO("VOC.pt")  # 使用 GPU
 
 # 上传视频保存路径
 UPLOAD_FOLDER = "uploads"
@@ -35,6 +35,17 @@ camera = None
 is_detecting = False
 detection_boxes = []  # 用于存储检测框的坐标
 current_video_path = None # 用于存储当前视频路径
+behavior_stats = defaultdict(list)  # 用于存储行为检测统计
+
+# 定义学习层次分类
+# INVALID_LEARNING = ["Using_phone", "bow_head", "sleep", "bend", "turn_head"]
+# SHALLOW_LEARNING = ["reading", "book", "writing"]
+# DEEP_LEARNING = ["hand-raising", "Stand", "Discuss"]
+
+INVALID_LEARNING = ["Th", "St"]
+SHALLOW_LEARNING = ["Wr", "Re", "Lc"]
+DEEP_LEARNING = ["Rh", "Gd", "Tg"]
+
 # 登录页面
 @app.route("/", methods=["GET", "POST"])
 def login():
@@ -84,15 +95,17 @@ def video_detection_feed():
                 is_detecting = False
                 cap.release()
                 break
-            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # 转换为 RGB
-            # frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).float().to("cuda") / 255.0  # 归一化并加载到 GPU
-            # frame_tensor = frame_tensor.unsqueeze(0)  # 添加 batch 维度
             # 进行检测
             results = model(frame)
             
             # 在原始帧上绘制检测结果
             annotated_frame = results[0].plot()
-            
+             # 统计检测到的行为
+            for box in results[0].boxes:
+                class_id = int(box.cls)
+                class_name = model.names[class_id]
+                behavior_stats[class_name].append(time.time())  # 记录检测时间
+            # print(model.names)
             # 转换为JPEG格式
             ret, buffer = cv2.imencode('.jpg', annotated_frame)
             frame_bytes = buffer.tobytes()
@@ -116,16 +129,15 @@ def generate_frames():
         else:
             # 调整输入图像的尺寸
             frame = cv2.resize(frame, (640, 640))  # 调整输入图像的尺寸
-
-            # 将帧转换为 GPU 张量
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # 转换为 RGB
-            frame_tensor = torch.from_numpy(frame).permute(2, 0, 1).float().to("cuda") / 255.0  # 归一化并加载到 GPU
-            frame_tensor = frame_tensor.unsqueeze(0)  # 添加 batch 维度
-
             # 进行检测
-            results = model(frame_tensor)
+            results = model(frame)
             detection_boxes = results[0].boxes.xyxy.cpu().numpy().tolist()  # 获取检测框坐标
 
+            # 统计检测到的行为
+            for box in results[0].boxes:
+                class_id = int(box.cls)
+                class_name = model.names[class_id]
+                behavior_stats[class_name].append(time.time())  # 记录检测时间
             # 将帧转换为 JPEG 格式
             ret, buffer = cv2.imencode('.jpg', frame)
             frame = buffer.tobytes()
@@ -145,6 +157,7 @@ def detection_data():
 def start_detection():
     global is_detecting
     is_detecting = True
+    behavior_stats = defaultdict(list)  # 重置行为统计
     return "Detection started"
 
 # 停止检测
@@ -152,12 +165,33 @@ def start_detection():
 def stop_detection():
     global is_detecting
     is_detecting = False
-    return "Detection stopped"
+    return redirect(url_for("detection_results"))  # 跳转到检测结果页面
 
 # 检测结果页面
 @app.route("/detection_results")
 def detection_results():
-    return render_template("detection_results.html")
+    global behavior_stats
+    # 打印调试信息
+    # print("Behavior Stats:", behavior_stats)
+    # 计算学习层次统计
+    # invalid_learning = sum(len(behavior_stats[behavior]) for behavior in INVALID_LEARNING)
+    # shallow_learning = sum(len(behavior_stats[behavior]) for behavior in SHALLOW_LEARNING)
+    # deep_learning = sum(len(behavior_stats[behavior]) for behavior in DEEP_LEARNING)
+
+    # # 将统计结果传递给前端
+    # stats = {
+    #     "invalid_learning": invalid_learning,
+    #     "shallow_learning": shallow_learning,
+    #     "deep_learning": deep_learning,
+    # }
+
+    # 计算每个二级指标的检测次数
+    stats = {}
+    for behavior in INVALID_LEARNING + SHALLOW_LEARNING + DEEP_LEARNING:
+        stats[behavior] = len(behavior_stats.get(behavior, []))
+    stats_json = json.dumps(stats)  # 将 stats 转换为 JSON 格式
+    print(stats)
+    return render_template("detection_results.html", stats_json=stats_json)
 
 # 退出登录
 @app.route("/logout")

@@ -23,29 +23,115 @@
         .results-container canvas {
             margin-bottom: 20px;
         }
+        .chart-container {
+            margin-bottom: 40px;
+        }
+        .chart-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="results-container">
-        <h1 class="text-center">检测结果统计</h1>
-        <canvas id="timeChart"></canvas>
+        <h1 class="text-center">课堂行为检测结果统计</h1>
+
+        <!-- 无效学习 -->
+        <div class="chart-container">
+            <div class="chart-title">无效学习（目标游离）</div>
+            <canvas id="invalidLearningChart"></canvas>
+        </div>
+
+        <!-- 浅层次学习 -->
+        <div class="chart-container">
+            <div class="chart-title">浅层次学习（存储-记忆、整合-应用）</div>
+            <canvas id="shallowLearningChart"></canvas>
+        </div>
+
+        <!-- 深层次学习 -->
+        <div class="chart-container">
+            <div class="chart-title">深层次学习（推断-迁移、协同-共创）</div>
+            <canvas id="deepLearningChart"></canvas>
+        </div>
+
         <a href="{{ url_for('behavior_detection') }}" class="btn btn-primary w-100">返回检测页面</a>
     </div>
+
     <script>
         const stats = JSON.parse('{{ stats_json | safe }}');
-        const ctx = document.getElementById('timeChart').getContext('2d');
-        const labels = Object.keys(stats);
-        const data = labels.map(label => stats[label].length);
-
-        new Chart(ctx, {
+        console.log("Stats:", stats);
+    
+        // 无效学习二级指标
+        const invalidLearningLabels = ['Th', 'St'];
+        const invalidLearningData = invalidLearningLabels.map(label => stats[label] || 0);
+    
+        // 浅层次学习二级指标
+        const shallowLearningLabels = ['Wr', 'Re', 'Lc'];
+        const shallowLearningData = shallowLearningLabels.map(label => stats[label] || 0);
+    
+        // 深层次学习二级指标
+        const deepLearningLabels = ['Rh', 'Gd', 'Tg'];
+        const deepLearningData = deepLearningLabels.map(label => stats[label] || 0);
+    
+        console.log("Invalid Learning Data:", invalidLearningData);
+        console.log("Shallow Learning Data:", shallowLearningData);
+        console.log("Deep Learning Data:", deepLearningData);
+    
+        // 无效学习图表
+        new Chart(document.getElementById('invalidLearningChart').getContext('2d'), {
             type: 'bar',
             data: {
-                labels: labels,
+                labels: invalidLearningLabels,
                 datasets: [{
                     label: '检测次数',
-                    data: data,
+                    data: invalidLearningData,
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    
+        // 浅层次学习图表
+        new Chart(document.getElementById('shallowLearningChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: shallowLearningLabels,
+                datasets: [{
+                    label: '检测次数',
+                    data: shallowLearningData,
                     backgroundColor: 'rgba(54, 162, 235, 0.2)',
                     borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    
+        // 深层次学习图表
+        new Chart(document.getElementById('deepLearningChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: deepLearningLabels,
+                datasets: [{
+                    label: '检测次数',
+                    data: deepLearningData,
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
                     borderWidth: 1
                 }]
             },

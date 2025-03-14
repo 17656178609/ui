@@ -146,6 +146,11 @@
             <button id="startBtn" class="btn btn-success">开始检测</button>
             <button id="stopBtn" class="btn btn-danger">停止检测</button>
         </div>
+
+        <!-- 跳转到检测结果页面的按钮 -->
+        <div class="btn-container">
+            <a href="{{ url_for('detection_results') }}" class="btn btn-primary">查看检测结果</a>
+        </div>
     </div>
 
     <script>
