@@ -13,135 +13,304 @@
             padding: 20px;
         }
         .results-container {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
             max-width: 1200px;
             margin: 0 auto;
         }
-        .results-container canvas {
-            margin-bottom: 20px;
-        }
         .chart-container {
-            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
         }
         .chart-title {
             font-size: 1.5rem;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #333;
+        }
+        .btn-return {
+            margin-top: 30px;
+            font-size: 1.1rem;
+            padding: 10px 20px;
         }
     </style>
 </head>
 <body>
     <div class="results-container">
-        <h1 class="text-center">课堂行为检测结果统计</h1>
+        <h1 class="text-center mb-4">课堂行为检测结果统计</h1>
 
-        <!-- 无效学习 -->
-        <div class="chart-container">
-            <div class="chart-title">无效学习（目标游离）</div>
-            <canvas id="invalidLearningChart"></canvas>
+        <!-- 第一行：课堂行为动作统计 -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="chart-container">
+                    <div class="chart-title">课堂行为动作统计</div>
+                    <canvas id="invalidLearningChart"></canvas>
+                </div>
+            </div>
         </div>
 
-        <!-- 浅层次学习 -->
-        <div class="chart-container">
-            <div class="chart-title">浅层次学习（存储-记忆、整合-应用）</div>
-            <canvas id="shallowLearningChart"></canvas>
+        <!-- 第二行：学习行为投入层次图表 -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="chart-container">
+                    <div class="chart-title">学习行为投入层次百分比</div>
+                    <canvas id="learningBehaviorChart"></canvas>
+                </div>
+            </div>
         </div>
 
-        <!-- 深层次学习 -->
-        <div class="chart-container">
-            <div class="chart-title">深层次学习（推断-迁移、协同-共创）</div>
-            <canvas id="deepLearningChart"></canvas>
+        <!-- 返回按钮 -->
+        <div class="text-center">
+            <a href="{{ url_for('behavior_detection') }}" class="btn btn-primary btn-return">返回检测页面</a>
+            <button id="saveChartBtn" class="btn btn-success btn-return">保存图表为图片</button>
         </div>
-
-        <a href="{{ url_for('behavior_detection') }}" class="btn btn-primary w-100">返回检测页面</a>
     </div>
 
     <script>
         const stats = JSON.parse('{{ stats_json | safe }}');
         console.log("Stats:", stats);
-    
+
         // 无效学习二级指标
         const invalidLearningLabels = ['Th', 'St'];
         const invalidLearningData = invalidLearningLabels.map(label => stats[label] || 0);
-    
+
         // 浅层次学习二级指标
         const shallowLearningLabels = ['Wr', 'Re', 'Lc'];
         const shallowLearningData = shallowLearningLabels.map(label => stats[label] || 0);
-    
+
         // 深层次学习二级指标
         const deepLearningLabels = ['Rh', 'Gd', 'Tg'];
         const deepLearningData = deepLearningLabels.map(label => stats[label] || 0);
-    
+
+        // 所有标签和数据
+        const labels = ['Th', 'St', 'Wr', 'Re', 'Lc', 'Rh', 'Gd', 'Tg'];
+        const values = labels.map(label => stats[label] || 0);
+        const total = values.reduce((a, b) => a + b, 0);
+
+        // 学习行为投入层次标签和数据
+        const LearningLabels = ['无效学习', '浅层次学习', '深层次学习'];
+        const calculatePercentage = (data) => {
+            const sum = data.reduce((acc, curr) => acc + curr, 0);
+            return ((sum / total) * 100).toFixed(2); // 转换为百分比并保留两位小数
+        };
+        const LearningData = [
+            calculatePercentage(invalidLearningData),
+            calculatePercentage(shallowLearningData),
+            calculatePercentage(deepLearningData)
+        ];
+
         console.log("Invalid Learning Data:", invalidLearningData);
         console.log("Shallow Learning Data:", shallowLearningData);
         console.log("Deep Learning Data:", deepLearningData);
-    
-        // 无效学习图表
+
         new Chart(document.getElementById('invalidLearningChart').getContext('2d'), {
-            type: 'bar',
+            type: 'bar', // 使用柱状图
             data: {
-                labels: invalidLearningLabels,
+                labels: labels, // X 轴标签（行为动作名称）
                 datasets: [{
-                    label: '检测次数',
-                    data: invalidLearningData,
-                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderWidth: 1
+                    label: '检测次数', // 数据集的标签
+                    data: values, // Y 轴数据（行为动作的检测次数）
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.2)', // 红色
+                        'rgba(54, 162, 235, 0.2)', // 蓝色
+                        'rgba(75, 192, 192, 0.2)', // 绿色
+                        'rgba(153, 102, 255, 0.2)', // 紫色
+                        'rgba(255, 159, 64, 0.2)', // 橙色
+                        'rgba(255, 205, 86, 0.2)', // 黄色
+                        'rgba(201, 203, 207, 0.2)', // 灰色
+                        'rgba(54, 162, 235, 0.2)' // 蓝色
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)', // 红色
+                        'rgba(54, 162, 235, 1)', // 蓝色
+                        'rgba(75, 192, 192, 1)', // 绿色
+                        'rgba(153, 102, 255, 1)', // 紫色
+                        'rgba(255, 159, 64, 1)', // 橙色
+                        'rgba(255, 205, 86, 1)', // 黄色
+                        'rgba(201, 203, 207, 1)', // 灰色
+                        'rgba(54, 162, 235, 1)' // 蓝色
+                    ],
+                    borderWidth: 1 // 边框宽度
                 }]
             },
             options: {
+                indexAxis: 'x', // X 轴为横轴
+                responsive: true, // 图表响应式布局
+                plugins: {
+                    legend: {
+                        display: true, // 显示图例
+                        position: 'top', // 图例位置
+                    },
+                    tooltip: {
+                        enabled: true, // 启用工具提示
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.raw}`; // 工具提示内容
+                            }
+                        }
+                    }
+                },
                 scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '行为动作', // X 轴标题
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
                     y: {
-                        beginAtZero: true
+                        title: {
+                            display: true,
+                            text: '检测次数', // Y 轴标题
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        beginAtZero: true, // Y 轴从 0 开始
+                        ticks: {
+                            font: {
+                                size: 12
+                            }
+                        }
                     }
                 }
             }
         });
-    
-        // 浅层次学习图表
-        new Chart(document.getElementById('shallowLearningChart').getContext('2d'), {
-            type: 'bar',
+
+        new Chart(document.getElementById('learningBehaviorChart').getContext('2d'), {
+            type: 'bar', // 使用柱状图
             data: {
-                labels: shallowLearningLabels,
+                labels: LearningLabels, // X 轴标签（学习行为层次）
                 datasets: [{
-                    label: '检测次数',
-                    data: shallowLearningData,
-                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
+                    label: '百分比 (%)', // 数据集的标签
+                    data: LearningData, // Y 轴数据（百分比）
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.5)', // 红色
+                        'rgba(54, 162, 235, 0.5)', // 蓝色
+                        'rgba(75, 192, 192, 0.5)' // 绿色
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)', // 红色
+                        'rgba(54, 162, 235, 1)', // 蓝色
+                        'rgba(75, 192, 192, 1)' // 绿色
+                    ],
+                    borderWidth: 1 // 边框宽度
                 }]
             },
             options: {
-                scales: {
-                    y: {
-                        beginAtZero: true
+                indexAxis: 'x', // X 轴为横轴
+                responsive: true, // 图表响应式布局
+                plugins: {
+                    legend: {
+                        display: true, // 显示图例
+                        position: 'top', // 图例位置
+                        labels: {
+                            font: {
+                                size: 14 // 图例字体大小
+                            }
+                        }
+                    },
+                    tooltip: {
+                        enabled: true, // 启用工具提示
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw}%`; // 工具提示内容
+                            }
+                        }
+                    },
+                    datalabels: { // 在柱状图上显示数据标签
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#333',
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        },
+                        formatter: function(value) {
+                            return value + '%'; // 显示百分比
+                        }
                     }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '学习行为层次', // X 轴标题
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: '百分比 (%)', // Y 轴标题
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            }
+                        },
+                        beginAtZero: true, // Y 轴从 0 开始
+                        max: 100, // Y 轴最大值为 100
+                        ticks: {
+                            font: {
+                                size: 12
+                            },
+                            callback: function(value) {
+                                return value + '%'; // Y 轴刻度显示百分比
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000, // 动画时长
+                    easing: 'easeInOutQuad' // 动画效果
                 }
             }
         });
-    
-        // 深层次学习图表
-        new Chart(document.getElementById('deepLearningChart').getContext('2d'), {
-            type: 'bar',
-            data: {
-                labels: deepLearningLabels,
-                datasets: [{
-                    label: '检测次数',
-                    data: deepLearningData,
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
+         // 保存图表为图片按钮点击事件
+        document.getElementById('saveChartBtn').addEventListener('click', function() {
+            // 获取图表 canvas 元素
+            const chart1Canvas = document.getElementById('invalidLearningChart');
+            const chart2Canvas = document.getElementById('learningBehaviorChart');
+            // 将图表转换为图片
+            const image1 = chart1Canvas.toDataURL('image/png');
+            const image2 = chart2Canvas.toDataURL('image/png');
+            // 创建下载链接
+            function downloadImage(image, filename) {
+                const a = document.createElement('a');
+                a.href = image;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             }
+            // 下载第一张图片
+            downloadImage(image1, 'behavior_chart_1.png');
+
+            // 下载第二张图片
+            downloadImage(image2, 'behavior_chart_2.png');
         });
     </script>
 </body>

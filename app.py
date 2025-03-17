@@ -18,7 +18,7 @@ users = {
 }
 
 # 加载训练好的 YOLOv8 模型
-model = YOLO("VOC.pt")  # 使用 GPU
+model = YOLO("static/model/VOC.pt")  # 使用 GPU
 
 # 上传视频保存路径
 UPLOAD_FOLDER = "uploads"
@@ -171,19 +171,6 @@ def stop_detection():
 @app.route("/detection_results")
 def detection_results():
     global behavior_stats
-    # 打印调试信息
-    # print("Behavior Stats:", behavior_stats)
-    # 计算学习层次统计
-    # invalid_learning = sum(len(behavior_stats[behavior]) for behavior in INVALID_LEARNING)
-    # shallow_learning = sum(len(behavior_stats[behavior]) for behavior in SHALLOW_LEARNING)
-    # deep_learning = sum(len(behavior_stats[behavior]) for behavior in DEEP_LEARNING)
-
-    # # 将统计结果传递给前端
-    # stats = {
-    #     "invalid_learning": invalid_learning,
-    #     "shallow_learning": shallow_learning,
-    #     "deep_learning": deep_learning,
-    # }
 
     # 计算每个二级指标的检测次数
     stats = {}
